@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>TabTab Apocalypse 우편 관리</title>
+<style>
+  body{font-family:-apple-system,system-ui,sans-serif;max-width:960px;margin:24px auto;padding:0 16px;color:#222}
+  h1{font-size:22px} h2{font-size:18px;margin-top:32px}
+  fieldset{border:1px solid #ddd;border-radius:8px;padding:12px 16px;margin:12px 0}
+  label{display:block;margin:8px 0 4px;font-weight:600;font-size:14px}
+  input,select,textarea{font:inherit;padding:6px 8px;border:1px solid #bbb;border-radius:6px;width:100%;box-sizing:border-box}
+  textarea{min-height:80px}
+  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .inline{display:flex;gap:8px;align-items:center} .inline input{flex:1}
+  button{font:inherit;padding:8px 14px;border:0;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer}
+  button.secondary{background:#e5e7eb;color:#111} button.danger{background:#dc2626}
+  button:disabled{opacity:.5;cursor:default}
+  table{width:100%;border-collapse:collapse;font-size:14px} th,td{border-bottom:1px solid #eee;padding:8px 6px;text-align:left;vertical-align:top}
+  .muted{color:#666;font-size:13px} .ok{color:#15803d} .err{color:#b91c1c}
+  #results button{margin:2px 4px 2px 0}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<h1>TabTab Apocalypse 우편 관리</h1>
+<p class="muted">게임 안 우편함으로 보상과 공지를 보냅니다. 관리자 계정으로 로그인해야 사용할 수 있습니다.</p>
+
+<div id="auth">
+  <span id="who" class="muted">로그인되어 있지 않습니다.</span>
+  <button id="login">Google 계정으로 로그인</button>
+  <button id="logout" class="secondary hidden">로그아웃</button>
+</div>
+<p id="status" class="muted"></p>
+
+<div id="app" class="hidden">
+  <h2>새 우편</h2>
+  <fieldset>
+    <label for="title">제목</label>
+    <input id="title" maxlength="40" placeholder="예: 서버 점검 보상">
+
+    <label for="content">내용 (선택)</label>
+    <textarea id="content" placeholder="우편을 열었을 때 보여줄 글. 비우면 확인 질문만 나옵니다."></textarea>
+
+    <label>받는 사람</label>
+    <div class="inline">
+      <select id="targetType" style="width:auto">
+        <option value="all">전체 플레이어</option>
+        <option value="one">특정 플레이어</option>
+      </select>
+      <input id="target" class="hidden" placeholder="플레이어 ID (예: g0123...)">
+    </div>
+    <div id="finder" class="hidden">
+      <label for="nick">닉네임으로 찾기</label>
+      <div class="inline"><input id="nick" placeholder="게임 설정 화면의 닉네임(#번호 포함 가능)"><button id="search" class="secondary">찾기</button></div>
+      <div id="results" class="muted"></div>
+    </div>
+
+    <label for="expire">받을 수 있는 마지막 날</label>
+    <input id="expire" type="date" style="width:auto">
+
+    <label>첨부 (모두 0이고 아이템이 없으면 보상 없는 공지로 보냅니다)</label>
+    <div class="row">
+      <div><span class="muted">골드</span><input id="gold" type="number" min="0" value="0"></div>
+      <div><span class="muted">다이아</span><input id="dia" type="number" min="0" value="0"></div>
+      <div><span class="muted">환생석</span><input id="fossil" type="number" min="0" value="0"></div>
+      <div><span class="muted">아이템</span><select id="item"></select></div>
+    </div>
+    <p><button id="send">보내기</button> <span id="sendMsg" class="muted"></span></p>
+  </fieldset>
+
+  <h2>보낸 우편 <button id="reload" class="secondary">새로고침</button></h2>
+  <table>
+    <thead><tr><th>제목</th><th>받는 사람</th><th>마지막 날</th><th>첨부</th><th>받은 사람</th><th></th></tr></thead>
+    <tbody id="posts"><tr><td colspan="6" class="muted">불러오는 중…</td></tr></tbody>
+  </table>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getDatabase, ref, get, push, set, remove } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+// Web app "TabTab Mail Admin" in Firebase project raising-disaster. These values are public by design;
+// access is controlled by the Realtime Database rules (only the admin account may write Post).
+const app = initializeApp({
+  apiKey: "AIzaSyDaLUO2TddBwVhocLwFORHbbWCrcv1XTzw",
+  authDomain: "raising-disaster.firebaseapp.com",
+  databaseURL: "https://raising-disaster.firebaseio.com",
+  projectId: "raising-disaster",
+  storageBucket: "raising-disaster.firebasestorage.app",
+  messagingSenderId: "1019445035118",
+  appId: "1:1019445035118:web:631f2b6d0d8af952ff667f",
+});
+const ADMIN = "wjs9280@gmail.com";
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+// InvenItemData.csv: value is the item number the game expects (Index - 1).
+const ITEMS = [{"v": 0, "name": "반짝 가루", "grade": "C"}, {"v": 1, "name": "검은 진흙", "grade": "C"}, {"v": 2, "name": "조개 껍질", "grade": "C"}, {"v": 3, "name": "아름다운 허물", "grade": "C"}, {"v": 4, "name": "미끌미끌한 비늘", "grade": "C"}, {"v": 5, "name": "가벼운 돌", "grade": "C"}, {"v": 6, "name": "빛의 점토", "grade": "B"}, {"v": 7, "name": "평온의 방울", "grade": "B"}, {"v": 8, "name": "신비의 물방울", "grade": "B"}, {"v": 9, "name": "녹지않는 얼음", "grade": "B"}, {"v": 10, "name": "부드러운 모래", "grade": "B"}, {"v": 11, "name": "은빛 가루", "grade": "A"}, {"v": 12, "name": "용의 이빨", "grade": "S"}, {"v": 13, "name": "진주", "grade": "S+"}, {"v": 14, "name": "수정 구슬", "grade": "A"}, {"v": 15, "name": "불타는 얼음", "grade": "S"}, {"v": 16, "name": "딱딱한 돌", "grade": "S"}, {"v": 17, "name": "해초", "grade": "A"}, {"v": 18, "name": "심해 가스", "grade": "S"}, {"v": 19, "name": "사암", "grade": "C"}, {"v": 20, "name": "토템", "grade": "A"}, {"v": 21, "name": "뼈-Z", "grade": "S+"}, {"v": 22, "name": "네잎 클로버", "grade": "A"}, {"v": 23, "name": "색색의 물방울", "grade": "S"}, {"v": 24, "name": "심해 에메랄드", "grade": "S"}, {"v": 25, "name": "금색 토템", "grade": "S+"}, {"v": 26, "name": "이끼가 낀 돌", "grade": "A"}, {"v": 27, "name": "얼음", "grade": "S"}, {"v": 28, "name": "쇠 구슬", "grade": "B"}, {"v": 29, "name": "녹조", "grade": "A"}, {"v": 30, "name": "보석 반지", "grade": "S"}, {"v": 31, "name": "붉은 산호", "grade": "C"}, {"v": 32, "name": "파란 산호", "grade": "C"}, {"v": 33, "name": "보라 산호", "grade": "B"}, {"v": 34, "name": "끈적한 액체", "grade": "B"}, {"v": 35, "name": "눈알", "grade": "S"}, {"v": 36, "name": "불가사리", "grade": "A"}, {"v": 37, "name": "세가지 공", "grade": "A"}, {"v": 38, "name": "익은 문어", "grade": "B"}, {"v": 39, "name": "바람 조각", "grade": "S+"}, {"v": 40, "name": "빛나는 돌", "grade": "S+"}];
+
+const $ = (id) => document.getElementById(id);
+const status = (text, cls = "muted") => { $("status").className = cls; $("status").textContent = text; };
+
+$("item").innerHTML = '<option value="-1">없음</option>' +
+  ITEMS.map((i) => `<option value="${i.v}">${i.name} (${i.grade})</option>`).join("");
+
+const today = () => { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); };
+const ymdToInput = (n) => `${String(n).slice(0, 4)}-${String(n).slice(4, 6)}-${String(n).slice(6, 8)}`;
+const inputToYmd = (s) => Number(s.replaceAll("-", ""));
+{ const d = new Date(); d.setDate(d.getDate() + 7); $("expire").value = d.toISOString().slice(0, 10); }
+
+$("login").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => status("로그인 실패: " + e.message, "err"));
+$("logout").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, (user) => {
+  const isAdmin = !!user && user.email === ADMIN && user.emailVerified;
+  $("who").textContent = user ? user.email : "로그인되어 있지 않습니다.";
+  $("login").classList.toggle("hidden", !!user);
+  $("logout").classList.toggle("hidden", !user);
+  $("app").classList.toggle("hidden", !isAdmin);
+  if (user && !isAdmin) status("관리자 계정이 아닙니다. 우편은 " + ADMIN + " 계정으로만 보낼 수 있습니다.", "err");
+  else status("");
+  if (isAdmin) loadPosts();
+});
+
+$("targetType").onchange = () => {
+  const one = $("targetType").value === "one";
+  $("target").classList.toggle("hidden", !one);
+  $("finder").classList.toggle("hidden", !one);
+};
+
+let usersCache = null;
+$("search").onclick = async () => {
+  const q = $("nick").value.trim().toLowerCase();
+  if (!q) return;
+  $("results").textContent = "찾는 중…";
+  try {
+    if (!usersCache) usersCache = (await get(ref(db, "Users"))).val() || {};
+    // The game shows "name#" + id.Substring(13) on the settings screen.
+    const hits = Object.entries(usersCache)
+      .map(([id, u]) => ({ id, tag: (u && u.userName ? u.userName : "?") + "#" + id.slice(13) }))
+      .filter((u) => u.tag.toLowerCase().includes(q) || u.id.toLowerCase().includes(q))
+      .slice(0, 20);
+    $("results").innerHTML = hits.length ? "" : "찾는 플레이어가 없습니다.";
+    for (const h of hits) {
+      const b = document.createElement("button");
+      b.className = "secondary";
+      b.textContent = h.tag;
+      b.title = h.id;
+      b.onclick = () => { $("target").value = h.id; };
+      $("results").appendChild(b);
+    }
+  } catch (e) { $("results").textContent = "검색 실패: " + e.message; }
+};
+
+$("send").onclick = async () => {
+  const title = $("title").value.trim();
+  const content = $("content").value.trim();
+  const toOne = $("targetType").value === "one";
+  const target = toOne ? $("target").value.trim() : "없음";
+  const expire = inputToYmd($("expire").value || "");
+  const gold = Math.max(0, parseInt($("gold").value || "0", 10));
+  const dia = Math.max(0, parseInt($("dia").value || "0", 10));
+  const fossil = Math.max(0, parseInt($("fossil").value || "0", 10));
+  const item = parseInt($("item").value, 10);
+  const reward = gold > 0 || dia > 0 || fossil > 0 || item >= 0;
+
+  if (!title) return $("sendMsg").textContent = "제목을 적어주세요.";
+  if (toOne && !/^[ag]_?\w+$/.test(target)) return $("sendMsg").textContent = "플레이어 ID를 확인해주세요.";
+  if (!expire || expire < today()) return $("sendMsg").textContent = "마지막 날은 오늘이거나 그 뒤여야 합니다.";
+  if (!reward && !content) return $("sendMsg").textContent = "보상이 없는 공지는 내용을 적어주세요.";
+  const who = toOne ? "플레이어 " + target : "전체 플레이어";
+  if (!confirm(`${who}에게 '${title}' 우편을 보냅니다.`)) return;
+
+  $("send").disabled = true;
+  try {
+    await set(push(ref(db, "Post")), {
+      "제목": title,
+      "대상": target,
+      "시간": expire,
+      "보상여부": reward ? "true" : "false",
+      "첨부": { "골드": gold, "다이아": dia, "환생석": fossil, "아이템": item, "내용": content || "없음" },
+    });
+    $("sendMsg").className = "ok";
+    $("sendMsg").textContent = "보냈습니다.";
+    $("title").value = ""; $("content").value = "";
+    loadPosts();
+  } catch (e) {
+    $("sendMsg").className = "err";
+    $("sendMsg").textContent = "보내지 못했습니다: " + e.message;
+  } finally { $("send").disabled = false; }
+};
+
+$("reload").onclick = () => loadPosts();
+
+async function loadPosts() {
+  const body = $("posts");
+  try {
+    const posts = (await get(ref(db, "Post"))).val() || {};
+    const rows = Object.entries(posts).sort((a, b) => (b[1]["시간"] || 0) - (a[1]["시간"] || 0));
+    body.innerHTML = rows.length ? "" : '<tr><td colspan="6" class="muted">우편이 없습니다.</td></tr>';
+    for (const [key, p] of rows) {
+      const a = p["첨부"] || {};
+      const parts = [];
+      if (+a["골드"] > 0) parts.push("골드 " + a["골드"]);
+      if (+a["다이아"] > 0) parts.push("다이아 " + a["다이아"]);
+      if (+a["환생석"] > 0) parts.push("환생석 " + a["환생석"]);
+      if (+a["아이템"] >= 0) { const it = ITEMS.find((i) => i.v === +a["아이템"]); parts.push("아이템 " + (it ? it.name : a["아이템"])); }
+      const target = String(p["대상"] || "");
+      const received = target === "없음" ? Object.keys(p["수령여부"] || {}).length + "명" : (target.startsWith("[수령된 물품]") ? "받음" : "안 받음");
+      const expired = +p["시간"] < today();
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${esc(p["제목"])}<div class="muted">${esc(a["내용"] && a["내용"] !== "없음" ? a["내용"] : "")}</div></td>
+        <td>${target === "없음" ? "전체" : esc(target.replace("[수령된 물품]", ""))}</td>
+        <td class="${expired ? "muted" : ""}">${p["시간"] ? ymdToInput(p["시간"]) : "-"}${expired ? " (지남)" : ""}</td>
+        <td>${p["보상여부"] === "true" ? esc(parts.join(", ")) : "공지"}</td>
+        <td>${received}</td>
+        <td><button class="danger">삭제</button></td>`;
+      tr.querySelector("button").onclick = async () => {
+        if (!confirm(`'${p["제목"]}' 우편을 지웁니다. 아직 안 받은 플레이어는 더 이상 받을 수 없습니다.`)) return;
+        await remove(ref(db, "Post/" + key));
+        loadPosts();
+      };
+      body.appendChild(tr);
+    }
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="6" class="err">불러오지 못했습니다: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+</script>
+</body>
+</html>
