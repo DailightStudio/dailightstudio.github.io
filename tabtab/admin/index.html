@@ -97,13 +97,13 @@ const ADMIN = "wjs9280@gmail.com";
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// InvenItemData.csv: value is the item number the game expects (Index - 1).
-const ITEMS = [{"v": 0, "name": "반짝 가루", "grade": "C"}, {"v": 1, "name": "검은 진흙", "grade": "C"}, {"v": 2, "name": "조개 껍질", "grade": "C"}, {"v": 3, "name": "아름다운 허물", "grade": "C"}, {"v": 4, "name": "미끌미끌한 비늘", "grade": "C"}, {"v": 5, "name": "가벼운 돌", "grade": "C"}, {"v": 6, "name": "빛의 점토", "grade": "B"}, {"v": 7, "name": "평온의 방울", "grade": "B"}, {"v": 8, "name": "신비의 물방울", "grade": "B"}, {"v": 9, "name": "녹지않는 얼음", "grade": "B"}, {"v": 10, "name": "부드러운 모래", "grade": "B"}, {"v": 11, "name": "은빛 가루", "grade": "A"}, {"v": 12, "name": "용의 이빨", "grade": "S"}, {"v": 13, "name": "진주", "grade": "S+"}, {"v": 14, "name": "수정 구슬", "grade": "A"}, {"v": 15, "name": "불타는 얼음", "grade": "S"}, {"v": 16, "name": "딱딱한 돌", "grade": "S"}, {"v": 17, "name": "해초", "grade": "A"}, {"v": 18, "name": "심해 가스", "grade": "S"}, {"v": 19, "name": "사암", "grade": "C"}, {"v": 20, "name": "토템", "grade": "A"}, {"v": 21, "name": "뼈-Z", "grade": "S+"}, {"v": 22, "name": "네잎 클로버", "grade": "A"}, {"v": 23, "name": "색색의 물방울", "grade": "S"}, {"v": 24, "name": "심해 에메랄드", "grade": "S"}, {"v": 25, "name": "금색 토템", "grade": "S+"}, {"v": 26, "name": "이끼가 낀 돌", "grade": "A"}, {"v": 27, "name": "얼음", "grade": "S"}, {"v": 28, "name": "쇠 구슬", "grade": "B"}, {"v": 29, "name": "녹조", "grade": "A"}, {"v": 30, "name": "보석 반지", "grade": "S"}, {"v": 31, "name": "붉은 산호", "grade": "C"}, {"v": 32, "name": "파란 산호", "grade": "C"}, {"v": 33, "name": "보라 산호", "grade": "B"}, {"v": 34, "name": "끈적한 액체", "grade": "B"}, {"v": 35, "name": "눈알", "grade": "S"}, {"v": 36, "name": "불가사리", "grade": "A"}, {"v": 37, "name": "세가지 공", "grade": "A"}, {"v": 38, "name": "익은 문어", "grade": "B"}, {"v": 39, "name": "바람 조각", "grade": "S+"}, {"v": 40, "name": "빛나는 돌", "grade": "S+"}];
+// InvenItemData.csv: value is the item's Sprite key, the game finds the item by it (Mad_Disaster tools/admin_items.py writes this line).
+const ITEMS = [{"v": "01_LightningPoweder", "name": "반짝 가루", "grade": "C"}, {"v": "02_BlackClay", "name": "검은 진흙", "grade": "C"}, {"v": "03_Shell", "name": "조개 껍질", "grade": "C"}, {"v": "20_rock", "name": "사암", "grade": "C"}, {"v": "04_BeautySkin", "name": "아름다운 허물", "grade": "C"}, {"v": "05_SmoothScale", "name": "미끌미끌한 비늘", "grade": "C"}, {"v": "06_LightStone", "name": "가벼운 돌", "grade": "C"}, {"v": "32_Sanho1", "name": "붉은 산호", "grade": "C"}, {"v": "33_Sanho2", "name": "파란 산호", "grade": "C"}, {"v": "29_MetalBall", "name": "쇠 구슬", "grade": "B"}, {"v": "35_Slime", "name": "끈적한 액체", "grade": "B"}, {"v": "34_Sanho3", "name": "보라 산호", "grade": "B"}, {"v": "39_WelldoneOcto", "name": "익은 문어", "grade": "B"}, {"v": "07_LightClay", "name": "빛의 점토", "grade": "B"}, {"v": "08_PieceBubble", "name": "평온의 방울", "grade": "B"}, {"v": "09_MysteryDrop", "name": "신비의 물방울", "grade": "B"}, {"v": "10_NeverMeltIce", "name": "녹지않는 얼음", "grade": "B"}, {"v": "11_SofrSand", "name": "부드러운 모래", "grade": "B"}, {"v": "12_SilverPowder", "name": "은빛 가루", "grade": "A"}, {"v": "23_Clover", "name": "네잎 클로버", "grade": "A"}, {"v": "27_GreenStone", "name": "이끼가 낀 돌", "grade": "A"}, {"v": "30_Nokzo", "name": "녹조", "grade": "A"}, {"v": "37_StarFish", "name": "불가사리", "grade": "A"}, {"v": "38_ThreeShpere", "name": "세가지 공", "grade": "A"}, {"v": "21_totem", "name": "토템", "grade": "A"}, {"v": "15_CrystalBall", "name": "수정 구슬", "grade": "A"}, {"v": "18_MarinePlant", "name": "해초", "grade": "A"}, {"v": "24_ColorfulBubble", "name": "색색의 물방울", "grade": "S"}, {"v": "28_IceCube", "name": "얼음", "grade": "S"}, {"v": "31_PurpleRing", "name": "보석 반지", "grade": "S"}, {"v": "13_DragonTeeth", "name": "용의 이빨", "grade": "S"}, {"v": "16_BurningIce", "name": "불타는 얼음", "grade": "S"}, {"v": "17_HardStone", "name": "딱딱한 돌", "grade": "S"}, {"v": "19_DeepSeaGas", "name": "심해 가스", "grade": "S"}, {"v": "25_Emerald", "name": "심해 에메랄드", "grade": "S"}, {"v": "36_SquidEye", "name": "눈알", "grade": "S"}, {"v": "14_Pearl", "name": "진주", "grade": "S+"}, {"v": "22_BoneZ", "name": "뼈-Z", "grade": "S+"}, {"v": "26_GoldenTotem", "name": "금색 토템", "grade": "S+"}, {"v": "40_Wind", "name": "바람 조각", "grade": "S+"}, {"v": "41_BlueStone", "name": "빛나는 돌", "grade": "S+"}];
 
 const $ = (id) => document.getElementById(id);
 const status = (text, cls = "muted") => { $("status").className = cls; $("status").textContent = text; };
 
-$("item").innerHTML = '<option value="-1">없음</option>' +
+$("item").innerHTML = '<option value="">없음</option>' +
   ITEMS.map((i) => `<option value="${i.v}">${i.name} (${i.grade})</option>`).join("");
 
 const today = () => { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); };
@@ -164,8 +164,8 @@ $("send").onclick = async () => {
   const gold = Math.max(0, parseInt($("gold").value || "0", 10));
   const dia = Math.max(0, parseInt($("dia").value || "0", 10));
   const fossil = Math.max(0, parseInt($("fossil").value || "0", 10));
-  const item = parseInt($("item").value, 10);
-  const reward = gold > 0 || dia > 0 || fossil > 0 || item >= 0;
+  const item = $("item").value; // InvenItemData Sprite, "" for none
+  const reward = gold > 0 || dia > 0 || fossil > 0 || item !== "";
 
   if (!title) return $("sendMsg").textContent = "제목을 적어주세요.";
   if (toOne && !/^[ag]_?\w+$/.test(target)) return $("sendMsg").textContent = "플레이어 ID를 확인해주세요.";
@@ -207,7 +207,7 @@ async function loadPosts() {
       if (+a["골드"] > 0) parts.push("골드 " + a["골드"]);
       if (+a["다이아"] > 0) parts.push("다이아 " + a["다이아"]);
       if (+a["환생석"] > 0) parts.push("환생석 " + a["환생석"]);
-      if (+a["아이템"] >= 0) { const it = ITEMS.find((i) => i.v === +a["아이템"]); parts.push("아이템 " + (it ? it.name : a["아이템"])); }
+      if (a["아이템"] !== undefined && a["아이템"] !== "" && a["아이템"] !== -1) { const it = ITEMS.find((i) => i.v === a["아이템"]); parts.push("아이템 " + (it ? it.name : a["아이템"])); }
       const target = String(p["대상"] || "");
       const received = target === "없음" ? Object.keys(p["수령여부"] || {}).length + "명" : (target.startsWith("[수령된 물품]") ? "받음" : "안 받음");
       const expired = +p["시간"] < today();
